@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import StudentPhotoUpload from "./StudentPhotoUpload";
 import type {
   Course,
@@ -29,31 +29,40 @@ const emptyForm: NewStudent = {
   photoUrl: "",
 };
 
+function getInitialForm(student: Student | null): NewStudent {
+  if (!student) {
+    return { ...emptyForm };
+  }
+
+  return {
+    name: student.name,
+    email: student.email,
+    course: student.course,
+    grade: student.grade,
+    status: student.status,
+    photoUrl: student.photoUrl ?? "",
+  };
+}
+
 export default function StudentForm({
   student,
   onSave,
   onClose,
 }: StudentFormProps) {
-  const [form, setForm] = useState<NewStudent>(emptyForm);
+  const [form, setForm] = useState<NewStudent>(
+    () => getInitialForm(student)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (student) {
-      const { id: _id, ...studentFields } = student;
-      setForm({ ...emptyForm, ...studentFields });
-    } else {
-      setForm(emptyForm);
-    }
-
-    setError("");
-  }, [student]);
 
   function updateField<K extends keyof NewStudent>(
     field: K,
     value: NewStudent[K]
   ) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
   }
 
   async function handleSubmit(
@@ -67,7 +76,9 @@ export default function StudentForm({
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    ) {
       setError("Please enter a valid email address.");
       return;
     }
@@ -83,11 +94,13 @@ export default function StudentForm({
 
     try {
       setSaving(true);
+
       await onSave({
         ...form,
         name: form.name.trim(),
         email: form.email.trim(),
       });
+
       onClose();
     } catch {
       setError("Unable to save the student. Please try again.");
@@ -100,7 +113,9 @@ export default function StudentForm({
     <div
       className="modal-backdrop"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && !saving) {
+          onClose();
+        }
       }}
     >
       <section
@@ -122,6 +137,7 @@ export default function StudentForm({
             type="button"
             onClick={onClose}
             aria-label="Close form"
+            disabled={saving}
           >
             ×
           </button>
@@ -131,18 +147,22 @@ export default function StudentForm({
           <div className="modal-body">
             <StudentPhotoUpload
               value={form.photoUrl ?? ""}
-              onChange={(value) => updateField("photoUrl", value)}
+              onChange={(value) =>
+                updateField("photoUrl", value)
+              }
             />
 
             <div className="form-grid">
               <label className="form-field">
                 Full name *
                 <input
+                  type="text"
                   value={form.name}
                   onChange={(event) =>
                     updateField("name", event.target.value)
                   }
                   placeholder="Enter full name"
+                  autoComplete="name"
                   required
                 />
               </label>
@@ -156,6 +176,7 @@ export default function StudentForm({
                     updateField("email", event.target.value)
                   }
                   placeholder="student@example.com"
+                  autoComplete="email"
                   required
                 />
               </label>
@@ -165,7 +186,10 @@ export default function StudentForm({
                 <select
                   value={form.course}
                   onChange={(event) =>
-                    updateField("course", event.target.value as Course)
+                    updateField(
+                      "course",
+                      event.target.value as Course
+                    )
                   }
                 >
                   {courses.map((course) => (
@@ -180,11 +204,16 @@ export default function StudentForm({
                 Grade (0–100)
                 <input
                   type="number"
-                  min="0"
-                  max="100"
+                  min={0}
+                  max={100}
                   value={form.grade}
                   onChange={(event) =>
-                    updateField("grade", Number(event.target.value))
+                    updateField(
+                      "grade",
+                      event.target.value === ""
+                        ? 0
+                        : Number(event.target.value)
+                    )
                   }
                   required
                 />
@@ -207,7 +236,11 @@ export default function StudentForm({
               </label>
             </div>
 
-            {error && <p className="form-error">{error}</p>}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
           </div>
 
           <div className="modal-footer">

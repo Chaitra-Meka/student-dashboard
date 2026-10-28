@@ -131,13 +131,14 @@ export default function App() {
 
       {formOpen && (
         <StudentForm
-          student={editingStudent}
-          onSave={handleSave}
-          onClose={() => {
-            setFormOpen(false);
-            setEditingStudent(null);
-          }}
-        />
+  key={editingStudent?.id ?? "new-student"}
+  student={editingStudent}
+  onSave={handleSave}
+  onClose={() => {
+    setFormOpen(false);
+    setEditingStudent(null);
+  }}
+/>
       )}
     </div>
   );

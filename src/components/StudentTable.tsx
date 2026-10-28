@@ -1,4 +1,5 @@
 
+import { memo } from "react";
 import type {
   Student,
   StudentStatus,
@@ -8,7 +9,10 @@ interface StudentTableProps {
   students: Student[];
   onEdit: (student: Student) => void;
   onDelete: (id: number) => void;
-  onStatusChange: (id: number, status: StudentStatus) => void;
+  onStatusChange: (
+    id: number,
+    status: StudentStatus
+  ) => void;
 }
 
 function getInitials(name: string) {
@@ -20,7 +24,7 @@ function getInitials(name: string) {
     .join("");
 }
 
-export default function StudentTable({
+function StudentTableComponent({
   students,
   onEdit,
   onDelete,
@@ -29,7 +33,9 @@ export default function StudentTable({
   if (students.length === 0) {
     return (
       <div className="empty-state">
-        <div className="empty-icon">⌕</div>
+        <div className="empty-icon" aria-hidden="true">
+          ⌕
+        </div>
         <h3>No students found</h3>
         <p>Try a different search or change your filters.</p>
       </div>
@@ -41,11 +47,13 @@ export default function StudentTable({
       <table className="student-table">
         <thead>
           <tr>
-            <th>STUDENT</th>
-            <th>COURSE</th>
-            <th>GRADE</th>
-            <th>STATUS</th>
-            <th className="actions-heading">ACTIONS</th>
+            <th scope="col">STUDENT</th>
+            <th scope="col">COURSE</th>
+            <th scope="col">GRADE</th>
+            <th scope="col">STATUS</th>
+            <th scope="col" className="actions-heading">
+              ACTIONS
+            </th>
           </tr>
         </thead>
 
@@ -61,7 +69,10 @@ export default function StudentTable({
                       alt=""
                     />
                   ) : (
-                    <div className="student-avatar avatar-fallback">
+                    <div
+                      className="student-avatar avatar-fallback"
+                      aria-hidden="true"
+                    >
                       {getInitials(student.name)}
                     </div>
                   )}
@@ -74,7 +85,9 @@ export default function StudentTable({
               </td>
 
               <td>
-                <span className="course-pill">{student.course}</span>
+                <span className="course-pill">
+                  {student.course}
+                </span>
               </td>
 
               <td>
@@ -82,13 +95,20 @@ export default function StudentTable({
                   <div className="grade-label">
                     <strong>{student.grade}%</strong>
                   </div>
+
                   <div
                     className="grade-track"
-                    aria-label={`Grade ${student.grade}%`}
+                    role="progressbar"
+                    aria-label={`Grade for ${student.name}`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={student.grade}
                   >
                     <div
                       className="grade-fill"
-                      style={{ width: `${student.grade}%` }}
+                      style={{
+                        width: `${student.grade}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -114,6 +134,7 @@ export default function StudentTable({
               <td>
                 <div className="table-actions">
                   <button
+                    type="button"
                     className="icon-button"
                     title="Edit student"
                     aria-label={`Edit ${student.name}`}
@@ -123,6 +144,7 @@ export default function StudentTable({
                   </button>
 
                   <button
+                    type="button"
                     className="icon-button delete-action"
                     title="Delete student"
                     aria-label={`Delete ${student.name}`}
@@ -139,3 +161,5 @@ export default function StudentTable({
     </div>
   );
 }
+
+export default memo(StudentTableComponent);

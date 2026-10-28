@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import SearchBar from "../components/SearchBar";
 import StudentTable from "../components/StudentTable";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -19,7 +19,10 @@ interface StudentsProps {
   onRetry: () => void;
   onEdit: (student: Student) => void;
   onDelete: (id: number) => void;
-  onStatusChange: (id: number, status: StudentStatus) => void;
+  onStatusChange: (
+    id: number,
+    status: StudentStatus
+  ) => void;
 }
 
 const courses: Course[] = [
@@ -29,7 +32,7 @@ const courses: Course[] = [
   "Java",
 ];
 
-const  USERS_PER_PAGE  = 20;
+const USERS_PER_PAGE = 20;
 
 export default function Students({
   students,
@@ -48,8 +51,7 @@ export default function Students({
   const debouncedSearch = useDebounce(search, 300);
 
   const filteredStudents = useMemo(() => {
-  const query = debouncedSearch.trim().toLowerCase();
-    
+    const query = debouncedSearch.trim().toLowerCase();
 
     return students.filter((student) => {
       const matchesSearch =
@@ -62,31 +64,53 @@ export default function Students({
       const matchesStatus =
         status === "All" || student.status === status;
 
-        return matchesSearch && matchesCourse && matchesStatus;
+      return matchesSearch && matchesCourse && matchesStatus;
     });
   }, [students, debouncedSearch, course, status]);
 
-        const totalPages = Math.ceil(filteredStudents.length / USERS_PER_PAGE);
+  const totalPages = Math.ceil(
+    filteredStudents.length / USERS_PER_PAGE
+  );
 
-const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+  // Keep the displayed page valid when results shrink,
+  // without calling setState inside an effect.
+  const safePage = Math.min(
+    currentPage,
+    Math.max(totalPages, 1)
+  );
 
-const currentStudents = filteredStudents.slice(
-  startIndex,
-  startIndex + USERS_PER_PAGE
-);
+  const startIndex = (safePage - 1) * USERS_PER_PAGE;
 
+  const currentStudents = useMemo(
+    () =>
+      filteredStudents.slice(
+        startIndex,
+        startIndex + USERS_PER_PAGE
+      ),
+    [filteredStudents, startIndex]
+  );
 
-      
-
-  useEffect(() => {
+  function handleSearchChange(value: string) {
+    setSearch(value);
     setCurrentPage(1);
-  }, [debouncedSearch, course, status]);
+  }
 
-   useEffect(() => {
-    setCurrentPage((page) =>
-      Math.min(page, Math.max(totalPages, 1))
-    );
-  }, [totalPages]);
+  function handleCourseChange(value: string) {
+    setCourse(value);
+    setCurrentPage(1);
+  }
+
+  function handleStatusChange(value: string) {
+    setStatus(value);
+    setCurrentPage(1);
+  }
+
+  function handleResetFilters() {
+    setSearch("");
+    setCourse("All");
+    setStatus("All");
+    setCurrentPage(1);
+  }
 
   if (loading) {
     return <LoadingSpinner />;
@@ -100,13 +124,17 @@ const currentStudents = filteredStudents.slice(
       />
     );
   }
+
   return (
     <div className="page-content">
       <div className="section-heading students-heading">
         <div>
           <h2>All Students</h2>
-          <p>Search, filter, and manage your student records.</p>
+          <p>
+            Search, filter, and manage your student records.
+          </p>
         </div>
+
         <span className="result-count">
           {filteredStudents.length} students
         </span>
@@ -114,15 +142,21 @@ const currentStudents = filteredStudents.slice(
 
       <section className="content-card students-card">
         <div className="filters-toolbar">
-          <SearchBar value={search} onChange={setSearch} />
+          <SearchBar
+            value={search}
+            onChange={handleSearchChange}
+          />
 
           <label className="filter-control">
             <span>Course</span>
             <select
               value={course}
-              onChange={(event) => setCourse(event.target.value)}
+              onChange={(event) =>
+                handleCourseChange(event.target.value)
+              }
             >
               <option value="All">All courses</option>
+
               {courses.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -135,7 +169,9 @@ const currentStudents = filteredStudents.slice(
             <span>Status</span>
             <select
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              onChange={(event) =>
+                handleStatusChange(event.target.value)
+              }
             >
               <option value="All">All statuses</option>
               <option value="Active">Active</option>
@@ -144,32 +180,28 @@ const currentStudents = filteredStudents.slice(
           </label>
 
           <button
+            type="button"
             className="button button-secondary clear-filters"
-            onClick={() => {
-              setSearch("");
-              setCourse("All");
-              setStatus("All");
-              setCurrentPage(1);
-            }}
+            onClick={handleResetFilters}
           >
             Reset
           </button>
         </div>
-        
+
         {currentStudents.length > 0 ? (
-        <StudentTable
-          students={currentStudents}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-        />
+          <StudentTable
+            students={currentStudents}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onStatusChange={onStatusChange}
+          />
         ) : (
-            <p className="empty-state">
+          <p className="empty-state">
             No students found. Try changing your search or filters.
           </p>
         )}
 
-         <div className="pagination">
+        <div className="pagination">
           <p className="pagination-info">
             Showing{" "}
             {filteredStudents.length === 0
@@ -192,13 +224,13 @@ const currentStudents = filteredStudents.slice(
                   Math.max(1, page - 1)
                 )
               }
-              disabled={currentPage === 1}
+              disabled={safePage <= 1}
             >
               Previous
             </button>
 
             <span className="pagination-page">
-              Page {currentPage} of {Math.max(totalPages, 1)}
+              Page {safePage} of {Math.max(totalPages, 1)}
             </span>
 
             <button
@@ -206,12 +238,14 @@ const currentStudents = filteredStudents.slice(
               className="button button-secondary"
               onClick={() =>
                 setCurrentPage((page) =>
-                  Math.min(Math.max(totalPages, 1), page + 1)
+                  Math.min(
+                    Math.max(totalPages, 1),
+                    page + 1
+                  )
                 )
               }
               disabled={
-                totalPages === 0 ||
-                currentPage >= totalPages
+                totalPages === 0 || safePage >= totalPages
               }
             >
               Next
