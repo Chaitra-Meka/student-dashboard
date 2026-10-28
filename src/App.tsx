@@ -1,0 +1,144 @@
+
+import {
+  lazy,
+  Suspense,
+  useState,
+} from "react";
+
+import Sidebar, {
+  type PageName,
+} from "./components/Sidebar";
+import Header from "./components/Header";
+import StudentForm from "./components/StudentForm";
+import LoadingSpinner from "./components/LoadingSpinner";
+
+import Dashboard from "./pages/Dashboard";
+import Students from "./pages/Students";
+import useStudents from "./hooks/useStudent";
+
+import type {
+  NewStudent,
+  Student,
+  StudentStatus,
+} from "./types/student";
+
+const StudentReports = lazy(
+  () => import("./pages/StudentReports")
+);
+
+export default function App() {
+  const {
+    students,
+    loading,
+    error,
+    refreshStudents,
+    addStudent,
+    updateStudent,
+    deleteStudent,
+    changeStatus,
+  } = useStudents();
+
+  const [page, setPage] = useState<PageName>("Dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingStudent, setEditingStudent] =
+    useState<Student | null>(null);
+
+  function openAddForm() {
+    setEditingStudent(null);
+    setFormOpen(true);
+  }
+
+  function openEditForm(student: Student) {
+    setEditingStudent(student);
+    setFormOpen(true);
+  }
+
+  async function handleSave(data: NewStudent) {
+    if (editingStudent) {
+      await updateStudent(editingStudent.id, data);
+    } else {
+      await addStudent(data);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this student?"
+    );
+
+    if (confirmed) {
+      await deleteStudent(id);
+    }
+  }
+
+  async function handleStatusChange(
+    id: number,
+    status: StudentStatus
+  ) {
+    await changeStatus(id, status);
+  }
+
+  function navigateTo(nextPage: PageName) {
+    setPage(nextPage);
+  }
+
+  return (
+    <div className="app-layout">
+      <Sidebar
+        page={page}
+        setPage={navigateTo}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <main className="main-area">
+        <Header
+          page={page}
+          onMenuClick={() => setSidebarOpen(true)}
+          onAddStudent={openAddForm}
+        />
+
+        {page === "Dashboard" && (
+          <Dashboard
+            students={students}
+            onViewStudents={() => setPage("Students")}
+          />
+        )}
+
+        {page === "Students" && (
+          <Students
+            students={students}
+            loading={loading}
+            error={error}
+            onRetry={refreshStudents}
+            onEdit={openEditForm}
+            onDelete={handleDelete}
+            onStatusChange={handleStatusChange}
+          />
+        )}
+
+        {page === "Reports" && (
+          <Suspense
+            fallback={
+              <LoadingSpinner message="Loading reports..." />
+            }
+          >
+            <StudentReports students={students} />
+          </Suspense>
+        )}
+      </main>
+
+      {formOpen && (
+        <StudentForm
+          student={editingStudent}
+          onSave={handleSave}
+          onClose={() => {
+            setFormOpen(false);
+            setEditingStudent(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
