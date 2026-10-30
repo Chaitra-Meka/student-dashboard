@@ -1,6 +1,13 @@
 
 import { useCallback, useEffect, useState } from "react";
-import { getStudents } from "../services/studentApi";
+
+import {
+  getStudents,
+  createStudent,
+  updateStudentApi,
+  deleteStudentApi,
+} from "../services/studentApi";
+
 import type {
   NewStudent,
   Student,
@@ -21,86 +28,89 @@ export default function useStudents() {
       const data = await getStudents();
       setStudents(data);
     } catch (err: unknown) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Unable to load students."
-      );
+          : "Unable to load students.";
+
+      setError(message);
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadStudents() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const data = await getStudents();
-
-        if (isMounted) {
-          setStudents(data);
-        }
-      } catch (err: unknown) {
-        if (isMounted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load students."
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadStudents();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const addStudent = async (data: NewStudent) => {
-    setStudents((current) => {
-      const nextId =
-        current.reduce(
-          (maxId, student) => Math.max(maxId, student.id),
-          0
-        ) + 1;
-
-      return [{ ...data, id: nextId }, ...current];
+    void refreshStudents().catch(() => {
+      // The error is stored in state and displayed by the page.
     });
+  }, [refreshStudents]);
+
+  const addStudent = async (data: NewStudent): Promise<void> => {
+    setError("");
+
+    try {
+      const createdStudent = await createStudent(data);
+
+      setStudents((current) => [createdStudent, ...current]);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unable to add student.";
+
+      setError(message);
+      throw err;
+    }
   };
 
   const updateStudent = async (
     id: number,
     changes: UpdateStudent
-  ) => {
-    setStudents((current) =>
-      current.map((student) =>
-        student.id === id
-          ? { ...student, ...changes }
-          : student
-      )
-    );
+  ): Promise<void> => {
+    setError("");
+
+    try {
+      const updatedStudent = await updateStudentApi(id, changes);
+
+      setStudents((current) =>
+        current.map((student) =>
+          student.id === id ? updatedStudent : student
+        )
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to update student.";
+
+      setError(message);
+      throw err;
+    }
   };
 
-  const deleteStudent = async (id: number) => {
-    setStudents((current) =>
-      current.filter((student) => student.id !== id)
-    );
+  const deleteStudent = async (id: number): Promise<void> => {
+    setError("");
+
+    try {
+      await deleteStudentApi(id);
+
+      setStudents((current) =>
+        current.filter((student) => student.id !== id)
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to delete student.";
+
+      setError(message);
+      throw err;
+    }
   };
 
   const changeStatus = async (
     id: number,
     status: StudentStatus
-  ) => {
+  ): Promise<void> => {
     await updateStudent(id, { status });
   };
 

@@ -161,7 +161,9 @@ export default function StudentForm({
                   onChange={(event) =>
                     updateField("name", event.target.value)
                   }
+                   style={{ textTransform: "capitalize" }}
                   placeholder="Enter full name"
+                 
                   autoComplete="name"
                   required
                 />

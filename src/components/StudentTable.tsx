@@ -1,4 +1,3 @@
-
 import { memo } from "react";
 import type {
   Student,
@@ -13,6 +12,7 @@ interface StudentTableProps {
     id: number,
     status: StudentStatus
   ) => void;
+  onViewProfile: (student: Student) => void;
 }
 
 function getInitials(name: string) {
@@ -29,6 +29,7 @@ function StudentTableComponent({
   onEdit,
   onDelete,
   onStatusChange,
+  onViewProfile,
 }: StudentTableProps) {
   if (students.length === 0) {
     return (
@@ -59,7 +60,7 @@ function StudentTableComponent({
 
         <tbody>
           {students.map((student) => (
-            <tr key={student.id}>
+            <tr key={student.displayId ?? student.id}>
               <td>
                 <div className="student-identity">
                   {student.photoUrl ? (
@@ -133,6 +134,15 @@ function StudentTableComponent({
 
               <td>
                 <div className="table-actions">
+                  <button
+                    type="button"
+                    className="view-profile-button"
+                    onClick={() => onViewProfile(student)}
+                    aria-label={`View profile of ${student.name}`}
+                  >
+                    View Profile
+                  </button>
+
                   <button
                     type="button"
                     className="icon-button"

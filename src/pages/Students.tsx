@@ -1,16 +1,15 @@
+import { useEffect, useMemo, useState } from "react";
+import type {
+  Student,
+  Course,
+  StudentStatus,
+} from "../types/student";
 
-import { useMemo, useState } from "react";
 import SearchBar from "../components/SearchBar";
 import StudentTable from "../components/StudentTable";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import useDebounce from "../hooks/useDebounce";
-
-import type {
-  Course,
-  Student,
-  StudentStatus,
-} from "../types/student";
 
 interface StudentsProps {
   students: Student[];
@@ -18,18 +17,24 @@ interface StudentsProps {
   error: string;
   onRetry: () => void;
   onEdit: (student: Student) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => void | Promise<void>;
   onStatusChange: (
     id: number,
     status: StudentStatus
-  ) => void;
+  ) => void | Promise<void>;
+  onViewProfile: (student: Student) => void;
 }
 
-const courses: Course[] = [
+const COURSES: Course[] = [
   "React",
   "TypeScript",
   "Python",
   "Java",
+];
+
+const STATUSES: StudentStatus[] = [
+  "Active",
+  "Inactive",
 ];
 
 const USERS_PER_PAGE = 20;
@@ -42,10 +47,13 @@ export default function Students({
   onEdit,
   onDelete,
   onStatusChange,
+  onViewProfile,
 }: StudentsProps) {
   const [search, setSearch] = useState("");
-  const [course, setCourse] = useState("All");
-  const [status, setStatus] = useState("All");
+  const [selectedCourse, setSelectedCourse] =
+    useState<Course | "All">("All");
+  const [selectedStatus, setSelectedStatus] =
+    useState<StudentStatus | "All">("All");
   const [currentPage, setCurrentPage] = useState(1);
 
   const debouncedSearch = useDebounce(search, 300);
@@ -59,200 +67,229 @@ export default function Students({
         student.email.toLowerCase().includes(query);
 
       const matchesCourse =
-        course === "All" || student.course === course;
+        selectedCourse === "All" ||
+        student.course === selectedCourse;
 
       const matchesStatus =
-        status === "All" || student.status === status;
+        selectedStatus === "All" ||
+        student.status === selectedStatus;
 
-      return matchesSearch && matchesCourse && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesCourse &&
+        matchesStatus
+      );
     });
-  }, [students, debouncedSearch, course, status]);
+  }, [
+    students,
+    debouncedSearch,
+    selectedCourse,
+    selectedStatus,
+  ]);
 
-  const totalPages = Math.ceil(
-    filteredStudents.length / USERS_PER_PAGE
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredStudents.length / USERS_PER_PAGE)
   );
 
-  // Keep the displayed page valid when results shrink,
-  // without calling setState inside an effect.
-  const safePage = Math.min(
-    currentPage,
-    Math.max(totalPages, 1)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    debouncedSearch,
+    selectedCourse,
+    selectedStatus,
+  ]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedStudents = useMemo(() => {
+    const startIndex =
+      (currentPage - 1) * USERS_PER_PAGE;
+
+    return filteredStudents.slice(
+      startIndex,
+      startIndex + USERS_PER_PAGE
+    );
+  }, [filteredStudents, currentPage]);
+
+  const firstStudent =
+    filteredStudents.length === 0
+      ? 0
+      : (currentPage - 1) * USERS_PER_PAGE + 1;
+
+  const lastStudent = Math.min(
+    currentPage * USERS_PER_PAGE,
+    filteredStudents.length
   );
-
-  const startIndex = (safePage - 1) * USERS_PER_PAGE;
-
-  const currentStudents = useMemo(
-    () =>
-      filteredStudents.slice(
-        startIndex,
-        startIndex + USERS_PER_PAGE
-      ),
-    [filteredStudents, startIndex]
-  );
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setCurrentPage(1);
-  }
-
-  function handleCourseChange(value: string) {
-    setCourse(value);
-    setCurrentPage(1);
-  }
-
-  function handleStatusChange(value: string) {
-    setStatus(value);
-    setCurrentPage(1);
-  }
-
-  function handleResetFilters() {
-    setSearch("");
-    setCourse("All");
-    setStatus("All");
-    setCurrentPage(1);
-  }
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <main className="page-content">
+        <h2>Students</h2>
+        <LoadingSpinner />
+      </main>
+    );
   }
 
   if (error) {
     return (
-      <ErrorMessage
-        message={error}
-        onRetry={onRetry}
-      />
+      <main className="page-content">
+        <h2>Students</h2>
+        <ErrorMessage
+          message={error}
+          onRetry={onRetry}
+        />
+      </main>
     );
   }
 
   return (
-    <div className="page-content">
-      <div className="section-heading students-heading">
+    <main className="page-content">
+      <header className="section-heading">
         <div>
-          <h2>All Students</h2>
+          <h2>Students</h2>
           <p>
-            Search, filter, and manage your student records.
+            Manage student records, courses, grades, and status.
           </p>
         </div>
 
-        <span className="result-count">
-          {filteredStudents.length} students
-        </span>
-      </div>
+        <p aria-live="polite">
+          {filteredStudents.length}{" "}
+          {filteredStudents.length === 1
+            ? "student"
+            : "students"}{" "}
+          found
+        </p>
+      </header>
 
-      <section className="content-card students-card">
-        <div className="filters-toolbar">
+      <section
+        className="students-filters"
+        aria-label="Student filters"
+      >
+        <div className="students-search">
           <SearchBar
             value={search}
-            onChange={handleSearchChange}
+            onChange={setSearch}
           />
+        </div>
 
-          <label className="filter-control">
-            <span>Course</span>
+        <div className="filter">
+          <div className="filter-group">
+            <label htmlFor="course-filter">
+              Course
+            </label>
+
             <select
-              value={course}
+              id="course-filter"
+              value={selectedCourse}
               onChange={(event) =>
-                handleCourseChange(event.target.value)
+                setSelectedCourse(
+                  event.target.value as Course | "All"
+                )
               }
             >
               <option value="All">All courses</option>
 
-              {courses.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+              {COURSES.map((course) => (
+                <option key={course} value={course}>
+                  {course}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="filter-control">
-            <span>Status</span>
+          <div className="filter-group">
+            <label htmlFor="status-filter">
+              Status
+            </label>
+
             <select
-              value={status}
+              id="status-filter"
+              value={selectedStatus}
               onChange={(event) =>
-                handleStatusChange(event.target.value)
+                setSelectedStatus(
+                  event.target.value as StudentStatus | "All"
+                )
               }
             >
               <option value="All">All statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
+
+              {STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
             </select>
-          </label>
+          </div>
 
           <button
             type="button"
-            className="button button-secondary clear-filters"
-            onClick={handleResetFilters}
+            className="reset-filters-button"
+            onClick={() => {
+              setSearch("");
+              setSelectedCourse("All");
+              setSelectedStatus("All");
+              setCurrentPage(1);
+            }}
           >
-            Reset
+            Reset filters
           </button>
         </div>
+      </section>
 
-        {currentStudents.length > 0 ? (
-          <StudentTable
-            students={currentStudents}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onStatusChange={onStatusChange}
-          />
-        ) : (
-          <p className="empty-state">
-            No students found. Try changing your search or filters.
-          </p>
-        )}
+      <section aria-label="Student records">
+        <StudentTable
+          students={paginatedStudents}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onViewProfile={onViewProfile}
+        />
+      </section>
 
-        <div className="pagination">
-          <p className="pagination-info">
-            Showing{" "}
-            {filteredStudents.length === 0
-              ? 0
-              : startIndex + 1}
-            {" "}to{" "}
-            {Math.min(
-              startIndex + USERS_PER_PAGE,
-              filteredStudents.length
-            )}
-            {" "}of {filteredStudents.length} students
+      {filteredStudents.length > 0 && (
+        <nav
+          className="pagination"
+          aria-label="Student pages"
+        >
+          <p aria-live="polite">
+            Showing {firstStudent}–{lastStudent} of{" "}
+            {filteredStudents.length}
           </p>
 
           <div className="pagination-controls">
             <button
               type="button"
-              className="button button-secondary"
               onClick={() =>
-                setCurrentPage((page) =>
-                  Math.max(1, page - 1)
-                )
+                setCurrentPage((page) => page - 1)
               }
-              disabled={safePage <= 1}
+              disabled={currentPage === 1}
+              aria-label="Go to previous page"
             >
               Previous
             </button>
 
-            <span className="pagination-page">
-              Page {safePage} of {Math.max(totalPages, 1)}
+            <span aria-current="page">
+              Page {currentPage} of {totalPages}
             </span>
 
             <button
               type="button"
-              className="button button-secondary"
               onClick={() =>
-                setCurrentPage((page) =>
-                  Math.min(
-                    Math.max(totalPages, 1),
-                    page + 1
-                  )
-                )
+                setCurrentPage((page) => page + 1)
               }
-              disabled={
-                totalPages === 0 || safePage >= totalPages
-              }
+              disabled={currentPage === totalPages}
+              aria-label="Go to next page"
             >
               Next
             </button>
           </div>
-        </div>
-      </section>
-    </div>
+        </nav>
+      )}
+    </main>
   );
 }

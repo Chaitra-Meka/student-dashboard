@@ -1,4 +1,3 @@
-
 import {
   lazy,
   Suspense,
@@ -10,6 +9,7 @@ import Sidebar, {
 } from "./components/Sidebar";
 import Header from "./components/Header";
 import StudentForm from "./components/StudentForm";
+import StudentProfile from "./components/StudentProfile";
 import LoadingSpinner from "./components/LoadingSpinner";
 
 import Dashboard from "./pages/Dashboard";
@@ -43,15 +43,23 @@ export default function App() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] =
     useState<Student | null>(null);
+  const [selectedStudent, setSelectedStudent] =
+    useState<Student | null>(null);
 
   function openAddForm() {
     setEditingStudent(null);
+    setSelectedStudent(null);
     setFormOpen(true);
   }
 
   function openEditForm(student: Student) {
+    setSelectedStudent(null);
     setEditingStudent(student);
     setFormOpen(true);
+  }
+
+  function openStudentProfile(student: Student) {
+    setSelectedStudent(student);
   }
 
   async function handleSave(data: NewStudent) {
@@ -60,6 +68,9 @@ export default function App() {
     } else {
       await addStudent(data);
     }
+
+    setFormOpen(false);
+    setEditingStudent(null);
   }
 
   async function handleDelete(id: number) {
@@ -69,6 +80,10 @@ export default function App() {
 
     if (confirmed) {
       await deleteStudent(id);
+
+      if (selectedStudent?.id === id) {
+        setSelectedStudent(null);
+      }
     }
   }
 
@@ -81,7 +96,14 @@ export default function App() {
 
   function navigateTo(nextPage: PageName) {
     setPage(nextPage);
+    setSelectedStudent(null);
   }
+
+  const currentProfile = selectedStudent
+    ? students.find(
+        (student) => student.id === selectedStudent.id
+      ) ?? selectedStudent
+    : null;
 
   return (
     <div className="app-layout">
@@ -106,7 +128,15 @@ export default function App() {
           />
         )}
 
-        {page === "Students" && (
+        {page === "Students" && currentProfile && (
+          <StudentProfile
+            student={currentProfile}
+            onBack={() => setSelectedStudent(null)}
+            onEdit={openEditForm}
+          />
+        )}
+
+        {page === "Students" && !currentProfile && (
           <Students
             students={students}
             loading={loading}
@@ -115,6 +145,7 @@ export default function App() {
             onEdit={openEditForm}
             onDelete={handleDelete}
             onStatusChange={handleStatusChange}
+            onViewProfile={openStudentProfile}
           />
         )}
 
@@ -131,14 +162,14 @@ export default function App() {
 
       {formOpen && (
         <StudentForm
-  key={editingStudent?.id ?? "new-student"}
-  student={editingStudent}
-  onSave={handleSave}
-  onClose={() => {
-    setFormOpen(false);
-    setEditingStudent(null);
-  }}
-/>
+          key={editingStudent?.id ?? "new-student"}
+          student={editingStudent}
+          onSave={handleSave}
+          onClose={() => {
+            setFormOpen(false);
+            setEditingStudent(null);
+          }}
+        />
       )}
     </div>
   );

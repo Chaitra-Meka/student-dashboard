@@ -8,6 +8,7 @@ export type StudentStatus = "Active" | "Inactive";
 
 export interface Student {
   id: number;
+  displayId?: number;
   name: string;
   email: string;
   course: Course;
